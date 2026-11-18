@@ -1,0 +1,405 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>엄마 근무표</title>
+<style>
+  :root{
+    --bg:#faf6f1; --card:#ffffff; --ink:#2b2622; --muted:#8a7f76; --line:#eee5dc;
+    --pong:#f08a5d; --pong-bg:#fde9df;
+    --out:#4aa89c; --out-bg:#dff3f0;
+    --off:#b9b0a7; --off-bg:#f3efea;
+    --leave:#8b6fd6; --leave-bg:#ece6fa;
+    --sun:#d9534f; --sat:#3b7dd8; --today:#2b2622;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#1b1815; --card:#262220; --ink:#f1ebe4; --muted:#a2978d; --line:#38312c;
+      --pong:#f4996f; --pong-bg:#4a2f22;
+      --out:#63c0b3; --out-bg:#1f3a36;
+      --off:#8d847b; --off-bg:#2e2a27;
+      --leave:#a891ec; --leave-bg:#352d52;
+      --sun:#ee7470; --sat:#6fa0ec; --today:#f1ebe4;
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+    line-height:1.45;-webkit-text-size-adjust:100%}
+  .wrap{max-width:560px;margin:0 auto;padding:20px 16px 48px}
+  h1{font-size:22px;margin:4px 0 14px;letter-spacing:-.02em}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px 16px;margin-bottom:12px}
+
+  /* 현재 상태 */
+  .now{display:flex;gap:12px;align-items:center}
+  .now .dot{width:12px;height:12px;border-radius:50%;flex:none}
+  .now b{font-size:17px}
+  .now small{display:block;color:var(--muted);font-size:13px}
+
+  .notice{background:var(--pong-bg);border-color:var(--pong);font-size:14px}
+
+  /* 달력 헤더 */
+  .nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+  .nav h2{margin:0;font-size:18px}
+  .nav .btns{display:flex;gap:6px}
+  button{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);
+    border-radius:10px;padding:7px 12px;cursor:pointer}
+  button:hover{border-color:var(--muted)}
+  button.primary{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+  button.purple{background:var(--leave);color:#fff;border-color:var(--leave)}
+  button:focus-visible,input:focus-visible{outline:2px solid var(--sat);outline-offset:2px}
+
+  .grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+  .dow{text-align:center;font-size:12px;color:var(--muted);padding:4px 0}
+  .dow:first-child{color:var(--sun)} .dow:nth-child(7){color:var(--sat)}
+  .cell{position:relative;min-height:62px;border-radius:10px;border:1px solid transparent;
+    padding:4px 3px;text-align:center;cursor:pointer;display:flex;flex-direction:column;
+    align-items:center;justify-content:flex-start;gap:2px;background:var(--off-bg);color:var(--ink)}
+  .cell.blank{background:none;cursor:default;border:none}
+  .cell .n{font-size:12px;color:var(--muted)}
+  .cell.sun .n{color:var(--sun)} .cell.sat .n{color:var(--sat)}
+  .cell .t{font-size:16px;font-weight:700;line-height:1.1}
+  .cell .s{font-size:10px;color:var(--muted);line-height:1.1}
+  .cell.pong{background:var(--pong-bg)} .cell.pong .t{color:var(--pong)}
+  .cell.out{background:var(--out-bg)}   .cell.out .t{color:var(--out)}
+  .cell.off .t{color:var(--off)}
+  .cell.leave{background:var(--leave-bg)} .cell.leave .t{color:var(--leave)}
+  .cell.today{box-shadow:inset 0 0 0 2px var(--today)}
+  .cell.sel{border-color:var(--ink)}
+
+  .legend{display:flex;flex-wrap:wrap;gap:8px 14px;margin-top:12px;font-size:12px;color:var(--muted)}
+  .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+
+  .stats{display:flex;gap:8px;margin-top:12px}
+  .stats div{flex:1;background:var(--off-bg);border-radius:10px;padding:8px;text-align:center;font-size:12px;color:var(--muted)}
+  .stats b{display:block;font-size:18px;color:var(--ink)}
+
+  /* 상세 */
+  .detail h3{margin:0 0 4px;font-size:16px}
+  .detail p{margin:0 0 10px;color:var(--muted);font-size:14px}
+  .actions{display:flex;flex-wrap:wrap;gap:8px}
+
+  .set{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:14px}
+  input[type=date]{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:6px 8px}
+  .hint{color:var(--muted);font-size:12px;margin:8px 0 0}
+  .leaves{margin:10px 0 0;padding:0;list-style:none;display:flex;flex-wrap:wrap;gap:6px}
+  .leaves li{background:var(--leave-bg);color:var(--leave);border-radius:999px;padding:3px 10px;font-size:13px}
+  #toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);
+    padding:9px 16px;border-radius:999px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s}
+  #toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>👩‍⚕️ 엄마 근무표 <span style="font-size:13px;color:var(--muted);font-weight:400">퐁당당</span></h1>
+
+  <div id="setup" class="card notice" hidden>
+    처음 한 번만! 엄마가 <b>퐁(출근)</b>하는 날을 달력에서 눌러 <b>“이 날을 퐁으로 설정”</b>을 누르거나, 아래 <b>기준 퐁 날짜</b>를 골라주세요.
+  </div>
+
+  <div class="card now" id="now"></div>
+
+  <div class="card">
+    <div class="nav">
+      <h2 id="title"></h2>
+      <div class="btns">
+        <button id="prev" aria-label="이전 달">◀</button>
+        <button id="today">오늘</button>
+        <button id="next" aria-label="다음 달">▶</button>
+      </div>
+    </div>
+    <div class="grid" id="dows"></div>
+    <div class="grid" id="cal"></div>
+    <div class="legend">
+      <span><i style="background:var(--pong)"></i>퐁 · 09시 출근</span>
+      <span><i style="background:var(--out)"></i>당 · 09시 퇴근</span>
+      <span><i style="background:var(--off)"></i>당 · 휴무</span>
+      <span><i style="background:var(--leave)"></i>연차</span>
+    </div>
+    <div class="stats">
+      <div><b id="stPong">0</b>근무(퐁)</div>
+      <div><b id="stLeave">0</b>연차</div>
+      <div><b id="stOff">0</b>휴무일</div>
+    </div>
+  </div>
+
+  <div class="card detail" id="detail"></div>
+
+  <div class="card">
+    <div class="set">
+      <label for="anchor"><b>기준 퐁 날짜</b></label>
+      <input type="date" id="anchor">
+    </div>
+    <p class="hint">이 날부터 퐁 → 당 → 당 이 3일마다 반복돼요.</p>
+    <b style="font-size:14px;display:block;margin-top:12px">승인된 연차</b>
+    <ul class="leaves" id="leaves"></ul>
+    <div class="actions" style="margin-top:12px">
+      <button id="share">🔗 공유 링크 복사</button>
+    </div>
+    <p class="hint" id="sync" style="font-weight:600"></p>
+    <p class="hint">실시간 공유를 켜지 않은 경우, 공유 링크를 열면 같은 근무표·연차가 보여요.</p>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script>
+const KEY = 'momSchedule.v1';
+const DOW = ['일','월','화','수','목','금','토'];
+const DAY = 86400000;
+
+// 날짜를 "UTC 기준 일수"로 다뤄서 시간대/서머타임 문제 없애기
+const toDn   = (y,m,d) => Math.floor(Date.UTC(y,m,d)/DAY);
+const keyOf  = dn => new Date(dn*DAY).toISOString().slice(0,10);
+const dnOf   = key => { const [y,m,d] = key.split('-').map(Number); return toDn(y,m-1,d); };
+const ymd    = dn => { const t = new Date(dn*DAY); return {y:t.getUTCFullYear(), m:t.getUTCMonth(), d:t.getUTCDate(), w:t.getUTCDay()}; };
+const nowDn  = () => { const t = new Date(); return toDn(t.getFullYear(), t.getMonth(), t.getDate()); };
+const fmt    = dn => { const o = ymd(dn); return `${o.m+1}월 ${o.d}일 (${DOW[o.w]})`; };
+
+/* ---------- 상태 ---------- */
+let state = load();
+let view  = (() => { const o = ymd(nowDn()); return {y:o.y, m:o.m}; })();
+let sel   = nowDn();
+
+function load(){
+  try{
+    const h = location.hash.match(/#d=([^&]+)/);
+    if(h){
+      const s = JSON.parse(atob(decodeURIComponent(h[1])));
+      if(s && s.anchor){
+        const st = {anchor:s.anchor, leaves:Array.isArray(s.leaves)?s.leaves:[], configured:true};
+        try{ localStorage.setItem(KEY, JSON.stringify(st)); }catch(e){}
+        history.replaceState(null,'',location.pathname+location.search);
+        return st;
+      }
+    }
+  }catch(e){}
+  try{
+    const s = JSON.parse(localStorage.getItem(KEY));
+    if(s && s.anchor) return s;
+  }catch(e){}
+  return {anchor:'2026-11-19', leaves:[], configured:true};   // 11/19(목)이 첫 퐁
+}
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){} }
+
+/* ---------- 실시간 공유 (Firebase Realtime Database) ----------
+   아래 주소를 채우면 누가 눌러도 모두에게 바로 반영돼요.
+   예: 'https://mom-schedule-default-rtdb.asia-southeast1.firebasedatabase.app'
+   비워두면 이 기기에서만 저장돼요. */
+const DB_URL = 'https://mom-schedule-401e1-default-rtdb.asia-southeast1.firebasedatabase.app';
+
+const live = { on: !!DB_URL, ok: false };
+function setStatus(){
+  const el = $('sync');
+  if(!el) return;
+  el.textContent = !live.on ? '이 기기에만 저장 중'
+                 : live.ok ? '🟢 실시간 공유 중'
+                 : '🔴 연결 중… (오프라인이면 잠시 후 다시 시도해요)';
+}
+async function remote(path, method, body){
+  if(!live.on) return;
+  try{
+    const r = await fetch(`${DB_URL}/${path}.json`, {
+      method, headers:{'Content-Type':'application/json'},
+      body: body === undefined ? undefined : JSON.stringify(body)
+    });
+    if(!r.ok) throw new Error(r.status);
+    live.ok = true;
+  }catch(e){ live.ok = false; toast('공유 서버에 저장하지 못했어요'); }
+  setStatus();
+}
+function applyRemote(data){
+  if(data === null){            // 서버가 비어 있으면 현재 값으로 처음 채워넣기
+    remote('', 'PUT', {anchor: state.anchor, leaves: Object.fromEntries(state.leaves.map(k => [k, true]))});
+    return;
+  }
+  if(data.anchor) state.anchor = data.anchor;
+  state.leaves = Object.keys(data.leaves || {});
+  state.configured = true;
+  save(); renderAll();
+}
+async function pull(){
+  try{
+    const r = await fetch(`${DB_URL}/.json`);
+    if(!r.ok) throw new Error(r.status);
+    live.ok = true; setStatus();
+    applyRemote(await r.json());
+  }catch(e){ live.ok = false; setStatus(); }
+}
+function startLive(){
+  if(!live.on) return;
+  pull();
+  try{
+    const es = new EventSource(`${DB_URL}/.json`);
+    const onChange = () => pull();
+    es.addEventListener('put', onChange);
+    es.addEventListener('patch', onChange);
+    es.onerror = () => { live.ok = false; setStatus(); };
+  }catch(e){}
+}
+function setLeave(k, on){
+  state.leaves = state.leaves.filter(x => x !== k);
+  if(on) state.leaves.push(k);
+  remote('leaves/' + k, on ? 'PUT' : 'DELETE', on ? true : undefined);
+}
+function setAnchor(k){
+  state.anchor = k; state.configured = true;
+  remote('anchor', 'PUT', k);
+}
+
+/* ---------- 근무 계산 ---------- */
+const phase = dn => (((dn - dnOf(state.anchor)) % 3) + 3) % 3;
+const isLeave = dn => state.leaves.includes(keyOf(dn));
+function typeOf(dn){
+  const p = phase(dn);
+  if(p === 0) return isLeave(dn) ? 'leave' : 'pong';
+  if(p === 1) return isLeave(dn-1) ? 'off' : 'out';   // 전날 연차면 퇴근도 없음
+  return 'off';
+}
+const LABEL = {
+  pong :{t:'퐁',  s:'09시 출근'},
+  out  :{t:'당',  s:'09시 퇴근'},
+  off  :{t:'당',  s:'휴무'},
+  leave:{t:'연차',s:'휴무'}
+};
+
+/* ---------- 렌더 ---------- */
+const $ = id => document.getElementById(id);
+
+function renderNow(){
+  const t = new Date();
+  const today = nowDn();
+  const hour = t.getHours();
+  const shiftDay = hour < 9 ? today-1 : today;     // 근무는 09시에 시작해서 다음날 09시에 끝남
+  const box = $('now');
+  let color, title, sub;
+
+  if(typeOf(shiftDay) === 'pong'){
+    color = 'var(--pong)';
+    title = '지금 근무 중이에요';
+    sub = hour < 9 ? '오늘 아침 9시에 퇴근' : '내일 아침 9시에 퇴근';
+  }else{
+    let next = null;
+    for(let i=0;i<40;i++){
+      const dn = today + i;
+      if(typeOf(dn)==='pong' && (i>0 || hour<9)){ next = dn; break; }
+    }
+    color = typeOf(today)==='leave' ? 'var(--leave)' : 'var(--out)';
+    title = typeOf(today)==='leave' ? '오늘은 연차예요' : '지금은 쉬는 중이에요';
+    if(next !== null){
+      const diff = next - today;
+      sub = `다음 출근 ${fmt(next)} 09시 · ${diff===0?'오늘':`D-${diff}`}`;
+    }else sub = '';
+  }
+  box.innerHTML = `<span class="dot" style="background:${color}"></span><div><b>${title}</b><small>${sub}</small></div>`;
+}
+
+function renderCal(){
+  $('title').textContent = `${view.y}년 ${view.m+1}월`;
+  const first = toDn(view.y, view.m, 1);
+  const days  = new Date(Date.UTC(view.y, view.m+1, 0)).getUTCDate();
+  const lead  = ymd(first).w;
+  const today = nowDn();
+  let html = '';
+  for(let i=0;i<lead;i++) html += '<div class="cell blank"></div>';
+  let cP=0, cL=0, cO=0;
+  for(let d=1; d<=days; d++){
+    const dn = first + d - 1;
+    const ty = typeOf(dn);
+    const w = (lead + d - 1) % 7;
+    if(ty==='pong') cP++; else if(ty==='leave') cL++; else cO++;
+    const cls = ['cell', ty, w===0?'sun':'', w===6?'sat':'', dn===today?'today':'', dn===sel?'sel':''].join(' ');
+    html += `<div class="${cls}" data-dn="${dn}" role="button" tabindex="0" aria-label="${fmt(dn)} ${LABEL[ty].t} ${LABEL[ty].s}">
+      <span class="n">${d}</span><span class="t">${LABEL[ty].t}</span><span class="s">${LABEL[ty].s}</span></div>`;
+  }
+  $('cal').innerHTML = html;
+  $('stPong').textContent = cP;
+  $('stLeave').textContent = cL;
+  $('stOff').textContent = cO;
+}
+
+function renderDetail(){
+  const ty = typeOf(sel);
+  const p = phase(sel);
+  const msg = {
+    pong :'아침 9시에 출근해서 다음날 아침 9시에 퇴근해요.',
+    out  :'오늘 아침 9시에 퇴근하고, 이 날부터 내일까지 쉬어요.',
+    off  :'쉬는 날이에요.',
+    leave:'연차가 승인된 날이에요. 출근하지 않고, 다음날 퇴근도 없어요.'
+  }[ty];
+  let btns = '';
+  if(p === 0 && ty === 'pong')  btns += `<button class="purple" data-act="leave">연차 승인됨 · 이 날 연차 처리</button>`;
+  if(ty === 'leave')            btns += `<button data-act="unleave">연차 취소</button>`;
+  btns += `<button data-act="anchor">이 날을 퐁으로 설정</button>`;
+  const note = (p !== 0) ? '<p class="hint">연차는 퐁(출근) 날에만 쓸 수 있어요.</p>' : '';
+  $('detail').innerHTML = `<h3>${fmt(sel)} · ${LABEL[ty].t} <span style="color:var(--muted);font-weight:400">${LABEL[ty].s}</span></h3>
+    <p>${msg}</p><div class="actions">${btns}</div>${note}`;
+}
+
+function renderSettings(){
+  $('anchor').value = state.anchor;
+  $('setup').hidden = state.configured;
+  const list = state.leaves.slice().sort().filter(k => phase(dnOf(k)) === 0);
+  $('leaves').innerHTML = list.length
+    ? list.map(k => `<li>${fmt(dnOf(k))}</li>`).join('')
+    : '<li style="background:var(--off-bg);color:var(--muted)">아직 없어요</li>';
+}
+
+function renderAll(){ renderNow(); renderCal(); renderDetail(); renderSettings(); }
+
+/* ---------- 이벤트 ---------- */
+function toast(msg){
+  const el = $('toast'); el.textContent = msg; el.classList.add('show');
+  clearTimeout(toast.t); toast.t = setTimeout(()=>el.classList.remove('show'), 1800);
+}
+function pick(dn){ sel = dn; renderCal(); renderDetail(); }
+
+$('cal').addEventListener('click', e => {
+  const c = e.target.closest('.cell[data-dn]'); if(c) pick(+c.dataset.dn);
+});
+$('cal').addEventListener('keydown', e => {
+  if(e.key==='Enter' || e.key===' '){
+    const c = e.target.closest('.cell[data-dn]'); if(c){ e.preventDefault(); pick(+c.dataset.dn); }
+  }
+});
+$('detail').addEventListener('click', e => {
+  const b = e.target.closest('button[data-act]'); if(!b) return;
+  const k = keyOf(sel);
+  if(b.dataset.act === 'leave'){
+    setLeave(k, true);
+    toast('연차로 반영했어요');
+  }else if(b.dataset.act === 'unleave'){
+    setLeave(k, false);
+    toast('연차를 취소했어요');
+  }else if(b.dataset.act === 'anchor'){
+    if(state.configured && !confirm(`${fmt(sel)}을(를) 퐁으로 바꾸면 전체 근무표가 이 날 기준으로 다시 계산돼요. 바꿀까요?`)) return;
+    setAnchor(k);
+    toast('기준 날짜를 바꿨어요');
+  }
+  save(); renderAll();
+});
+$('anchor').addEventListener('change', e => {
+  if(!e.target.value) return;
+  setAnchor(e.target.value); save(); renderAll();
+});
+$('prev').onclick  = () => { view.m--; if(view.m<0){view.m=11;view.y--;} renderCal(); };
+$('next').onclick  = () => { view.m++; if(view.m>11){view.m=0;view.y++;} renderCal(); };
+$('today').onclick = () => { const o = ymd(nowDn()); view={y:o.y,m:o.m}; sel=nowDn(); renderAll(); };
+
+$('share').onclick = async () => {
+  const data = encodeURIComponent(btoa(JSON.stringify({anchor:state.anchor, leaves:state.leaves})));
+  const url = location.href.split('#')[0] + '#d=' + data;
+  try{ await navigator.clipboard.writeText(url); toast('링크를 복사했어요'); }
+  catch(e){ prompt('이 링크를 복사해서 보내주세요', url); }
+};
+
+// 요일 헤더
+$('dows').innerHTML = DOW.map(d => `<div class="dow">${d}</div>`).join('');
+if(live.on) $('share').hidden = true;
+setStatus();
+renderAll();
+startLive();
+setInterval(renderNow, 60000);
+</script>
+</body>
+</html>
