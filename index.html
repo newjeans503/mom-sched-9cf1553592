@@ -62,8 +62,7 @@
   .cell .t{font-size:16px;font-weight:700;line-height:1.1}
   .cell .s{font-size:10px;color:var(--muted);line-height:1.1}
   .cell.pong{background:var(--pong-bg)} .cell.pong .t{color:var(--pong)}
-  .cell.out{background:var(--out-bg)}   .cell.out .t{color:var(--out)}
-  .cell.off{background:var(--out-bg)} .cell.off .t{color:var(--out)}
+  .cell.out .t, .cell.off .t{color:var(--off)}
   .cell.leave{background:var(--leave-bg)} .cell.leave .t{color:var(--leave)}
   .cell.today{box-shadow:inset 0 0 0 2px var(--today)}
   .cell.sel{border-color:var(--ink)}
@@ -113,7 +112,7 @@
     <div class="grid" id="cal"></div>
     <div class="legend">
       <span><i style="background:var(--pong)"></i>퐁 · 09시 출근</span>
-      <span><i style="background:var(--out)"></i>당 · 퇴근일 / 휴무</span>
+      <span><i style="background:var(--off)"></i>당 · 휴무</span>
       <span><i style="background:var(--leave)"></i>연차</span>
     </div>
     <div class="stats">
@@ -270,7 +269,7 @@ function typeOf(dn){
 }
 const LABEL = {
   pong :{t:'퐁',  s:'09시 출근'},
-  out  :{t:'당',  s:'09시 퇴근'},
+  out  :{t:'당',  s:'휴무'},
   off  :{t:'당',  s:'휴무'},
   leave:{t:'연차',s:'휴무'}
 };
