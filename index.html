@@ -139,7 +139,7 @@
       <span>개</span>
     </div>
     <p class="hint" id="balInfo"></p>
-    <p class="hint">기준 날짜 이후에 쓴 연차만 차감돼요. 개수가 달라지면 오늘 날짜와 그때 남은 개수로 바꿔주세요.</p>
+    <p class="hint">입사일 4월 23일 기준으로 매달 23일에 1개씩 자동으로 생겨요(1년 미만, 총 11개). 기준 날짜 이후에 생기고 쓴 연차만 계산하니, 개수가 어긋나면 오늘 날짜와 그때 남은 개수로 바꿔주세요.</p>
     <b style="font-size:14px;display:block;margin-top:12px">승인된 연차</b>
     <ul class="leaves" id="leaves"></ul>
     <div class="actions" style="margin-top:12px">
@@ -167,7 +167,7 @@ const fmt    = dn => { const o = ymd(dn); return `${o.m+1}월 ${o.d}일 (${DOW[o
 /* ---------- 상태 ---------- */
 let state = load();
 // 잔여 연차 기준: asOf 날짜 시점에 remaining개가 남아 있었다는 뜻 (그 이후에 쓴 연차만 차감)
-if(!state.balance) state.balance = {asOf:'2026-11-18', remaining:6};
+if(!state.balance) state.balance = {asOf:'2026-11-18', remaining:3};
 let view = (() => { const o = ymd(nowDn()); return {y:o.y, m:o.m}; })();
 let sel   = nowDn();
 
@@ -188,7 +188,7 @@ function load(){
     const s = JSON.parse(localStorage.getItem(KEY));
     if(s && s.anchor) return s;
   }catch(e){}
-  return {anchor:'2026-11-19', leaves:['2026-12-28','2026-12-31'], configured:true};   // 11/19(목)이 첫 퐁
+  return {anchor:'2026-11-19', leaves:['2026-11-25','2026-12-28','2026-12-31'], configured:true};   // 11/19(목)이 첫 퐁
 }
 function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){} }
 
@@ -359,15 +359,31 @@ function renderSettings(){
   $('stRemain').style.color = r < 0 ? 'var(--sun)' : '';
   $('balAsOf').value = state.balance.asOf;
   $('balNum').value = state.balance.remaining;
-  $('balInfo').textContent = `${fmt(dnOf(state.balance.asOf))} 기준 ${state.balance.remaining}개 − 그 이후 쓴(쓸) 연차 ${usedAfter()}개 = ${r}개`;
+  const todayK = keyOf(nowDn());
+  const planned = state.leaves.filter(k => k > todayK && phase(dnOf(k)) === 0).sort();
+  let info = `오늘 기준 남은 연차 ${r}개`;
+  if(planned.length){
+    const last = planned[planned.length-1];
+    info += `<br>예정된 연차 ${planned.length*COST}개(${planned.map(k => { const o = ymd(dnOf(k)); return `${o.m+1}/${o.d}`; }).join(', ')})와 매달 23일에 생기는 연차를 반영하면 ${fmt(dnOf(last))}에 ${balanceAt(last)}개 남아요`;
+  }
+  const nextAcc = accrualKeys.find(k => k > todayK);
+  if(nextAcc) info += `<br>다음 연차 발생: ${fmt(dnOf(nextAcc))} (+1개)`;
+  $('balInfo').innerHTML = info;
 }
 
-// 기준일 이후의 연차만 차감. 퐁 하루를 쉬면 연차 2개
+// 퐁 하루를 쉬면 연차 2개
 const COST = 2;
-function usedAfter(){
-  return state.leaves.filter(k => k > state.balance.asOf && phase(dnOf(k)) === 0).length * COST;
+// 입사일 2026-04-23. 1년 미만이라 매달 23일에 1개씩 생김 (5/23 ~ 다음해 3/23, 총 11개). 1년 되면 퇴사 예정이라 그 이후는 계산하지 않음
+const JOIN = {y:2026, m:3, d:23};
+const accrualKeys = (() => { const a = []; for(let i=1;i<=11;i++) a.push(keyOf(toDn(JOIN.y, JOIN.m+i, JOIN.d))); return a; })();
+// dKey 날짜까지 반영한 남은 연차 = 기준 개수 + 기준일 이후 생긴 연차 − 기준일 이후 쓴 연차
+function balanceAt(dKey){
+  const asOf = state.balance.asOf;
+  const got  = accrualKeys.filter(k => k > asOf && k <= dKey).length;
+  const used = state.leaves.filter(k => k > asOf && k <= dKey && phase(dnOf(k)) === 0).length * COST;
+  return state.balance.remaining + got - used;
 }
-function remaining(){ return state.balance.remaining - usedAfter(); }
+function remaining(){ return balanceAt(keyOf(nowDn())); }
 function setBalance(asOf, n){
   state.balance = {asOf, remaining:n};
   remote('balance', 'PUT', state.balance);
