@@ -119,7 +119,7 @@
     </div>
     <div class="stats">
       <div><b id="stPong">0</b>근무(퐁)</div>
-      <div><b id="stLeave">0</b>연차</div>
+      <div><b id="stLeave">0</b>연차 사용</div>
       <div><b id="stOff">0</b>휴무일</div>
       <div style="background:var(--leave-bg)"><b id="stRemain">0</b>남은 연차</div>
     </div>
@@ -190,7 +190,7 @@ function load(){
     const s = JSON.parse(localStorage.getItem(KEY));
     if(s && s.anchor) return s;
   }catch(e){}
-  return {anchor:'2026-11-19', leaves:['2026-12-28','2026-12-29','2026-12-31','2027-01-01'], configured:true};   // 11/19(목)이 첫 퐁
+  return {anchor:'2026-11-19', leaves:['2026-12-28','2026-12-31'], configured:true};   // 11/19(목)이 첫 퐁
 }
 function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){} }
 
@@ -266,10 +266,7 @@ const isLeave = dn => state.leaves.includes(keyOf(dn));
 function typeOf(dn){
   const p = phase(dn);
   if(p === 0) return isLeave(dn) ? 'leave' : 'pong';
-  if(p === 1){
-    if(isLeave(dn)) return 'leave';                    // 퇴근하는 당 날도 연차를 쓸 수 있음
-    return isLeave(dn-1) ? 'off' : 'out';              // 전날 연차면 퇴근도 없음
-  }
+  if(p === 1) return isLeave(dn-1) ? 'off' : 'out';   // 퐁 날이 연차면 퇴근도 없음
   return 'off';
 }
 const LABEL = {
@@ -323,7 +320,7 @@ function renderCal(){
     const dn = first + d - 1;
     const ty = typeOf(dn);
     const w = (lead + d - 1) % 7;
-    if(ty==='pong') cP++; else if(ty==='leave') cL++; else cO++;
+    if(ty==='pong') cP++; else if(ty==='leave') cL += COST; else cO++;
     const cls = ['cell', ty, w===0?'sun':'', w===6?'sat':'', dn===today?'today':'', dn===sel?'sel':''].join(' ');
     html += `<div class="${cls}" data-dn="${dn}" role="button" tabindex="0" aria-label="${fmt(dn)} ${LABEL[ty].t} ${LABEL[ty].s}">
       <span class="n">${d}</span><span class="t">${LABEL[ty].t}</span><span class="s">${LABEL[ty].s}</span></div>`;
@@ -341,18 +338,13 @@ function renderDetail(){
     pong :'아침 9시에 출근해서 다음날 아침 9시에 퇴근해요.',
     out  :'오늘 아침 9시에 퇴근하고, 이 날부터 내일까지 쉬어요.',
     off  :'쉬는 날이에요.',
-    leave: p === 0 ? '퐁 날 연차예요. 출근하지 않아요. (연차 1개 사용)'
-                   : '퇴근하는 당 날 연차예요. (연차 1개 사용)'
+    leave:'퐁을 하루 온전히 쉬어요. 출근하지 않고 다음날 퇴근도 없어요. (연차 2개 사용)'
   }[ty];
   let btns = '';
-  if(p === 0 && ty === 'pong'){
-    btns += `<button class="purple" data-act="leave2">퐁 하루 온전히 쉬기 · 연차 2개</button>`;
-    btns += `<button data-act="leave">이 날만 연차 · 1개</button>`;
-  }
-  if(p === 1 && ty !== 'leave') btns += `<button class="purple" data-act="leave">이 날 연차 · 1개</button>`;
-  if(ty === 'leave')            btns += `<button data-act="unleave">연차 취소 · 1개 돌려받기</button>`;
+  if(ty === 'pong')   btns += `<button class="purple" data-act="leave">연차 처리 · 2개 사용</button>`;
+  if(ty === 'leave')  btns += `<button data-act="unleave">연차 취소 · 2개 돌려받기</button>`;
   btns += `<button data-act="anchor">이 날을 퐁으로 설정</button>`;
-  const note = (p === 2) ? '<p class="hint">연차는 퐁 날과 퇴근하는 당 날에 쓸 수 있어요.</p>' : '';
+  const note = (p !== 0) ? '<p class="hint">연차는 퐁(출근) 날에만 쓸 수 있어요. 퐁 하루를 쉬면 연차가 2개 들어요.</p>' : '';
   $('detail').innerHTML = `<h3>${fmt(sel)} · ${LABEL[ty].t} <span style="color:var(--muted);font-weight:400">${LABEL[ty].s}</span></h3>
     <p>${msg}</p><div class="actions">${btns}</div>${note}`;
 }
@@ -360,22 +352,22 @@ function renderDetail(){
 function renderSettings(){
   $('anchor').value = state.anchor;
   $('setup').hidden = state.configured;
-  const list = state.leaves.slice().sort().filter(k => phase(dnOf(k)) <= 1);
+  const list = state.leaves.slice().sort().filter(k => phase(dnOf(k)) === 0);
   $('leaves').innerHTML = list.length
-    ? list.map(k => `<li>${fmt(dnOf(k))}</li>`).join('')
+    ? list.map(k => `<li>${fmt(dnOf(k))} · 2개</li>`).join('')
     : '<li style="background:var(--off-bg);color:var(--muted)">아직 없어요</li>';
   const r = remaining();
   $('stRemain').textContent = r;
   $('stRemain').style.color = r < 0 ? 'var(--sun)' : '';
   $('balAsOf').value = state.balance.asOf;
   $('balNum').value = state.balance.remaining;
-  const used = usedAfter();
-  $('balInfo').textContent = `${fmt(dnOf(state.balance.asOf))} 기준 ${state.balance.remaining}개 − 그 이후 쓴(쓸) 연차 ${used}개 = ${r}개`;
+  $('balInfo').textContent = `${fmt(dnOf(state.balance.asOf))} 기준 ${state.balance.remaining}개 − 그 이후 쓴(쓸) 연차 ${usedAfter()}개 = ${r}개`;
 }
 
-// 기준일 이후의 연차만 차감 (퐁 날·퇴근 당 날 모두 1개씩)
+// 기준일 이후의 연차만 차감. 퐁 하루를 쉬면 연차 2개
+const COST = 2;
 function usedAfter(){
-  return state.leaves.filter(k => k > state.balance.asOf && phase(dnOf(k)) <= 1).length;
+  return state.leaves.filter(k => k > state.balance.asOf && phase(dnOf(k)) === 0).length * COST;
 }
 function remaining(){ return state.balance.remaining - usedAfter(); }
 function setBalance(asOf, n){
@@ -405,13 +397,10 @@ $('detail').addEventListener('click', e => {
   const k = keyOf(sel);
   if(b.dataset.act === 'leave'){
     setLeave(k, true);
-    toast('연차 1개를 사용했어요');
-  }else if(b.dataset.act === 'leave2'){
-    setLeave(k, true); setLeave(keyOf(sel+1), true);
     toast('연차 2개를 사용했어요');
   }else if(b.dataset.act === 'unleave'){
     setLeave(k, false);
-    toast('연차 1개를 돌려받았어요');
+    toast('연차 2개를 돌려받았어요');
   }else if(b.dataset.act === 'anchor'){
     if(state.configured && !confirm(`${fmt(sel)}을(를) 퐁으로 바꾸면 전체 근무표가 이 날 기준으로 다시 계산돼요. 바꿀까요?`)) return;
     setAnchor(k);
